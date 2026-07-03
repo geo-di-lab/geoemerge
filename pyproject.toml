@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geoemerge"
+version = "0.0.1"
+authors = [
+  {name = "Geospatial Digital Informatics Lab", email = "yangdi1031@ufl.edu"},
+]
+description = "Process geospatial participatory science data"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "geopandas>=0.14.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "requests>=2.31.0"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/geo-di-lab/geoemerge"
+"Bug Tracker" = "https://github.com/geo-di-lab/geoemerge/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
