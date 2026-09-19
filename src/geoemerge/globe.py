@@ -5,6 +5,38 @@ from typing import Any
 import requests
 from pathlib import Path
 
+def _fetch_globe_features(url: str, timeout: int = 300) -> list:
+    """
+    Fetches a GeoJSON FeatureCollection from the GLOBE API and returns its features.
+    """
+    headers = {"User-Agent": "geoemerge"}
+
+    try:
+        response = requests.get(url, headers=headers, timeout=timeout)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Failed to fetch data from GLOBE API: {e}")
+
+    if not response.content.strip():
+        raise RuntimeError("The GLOBE API returned an empty response.")
+
+    try:
+        payload = response.json()
+    except ValueError:
+        snippet = response.text[:200].replace("\n", " ")
+        raise RuntimeError(
+            f"The GLOBE API did not return valid JSON. First characters of the "
+            f"response: {snippet!r}"
+        )
+
+    if not isinstance(payload, dict) or "features" not in payload:
+        raise RuntimeError(
+            f"Unexpected response from the GLOBE API (no 'features' key). "
+            f"Check the protocol name and date range. Response: {str(payload)[:200]!r}"
+        )
+
+    return payload["features"] or []
+
 def _clean_column_names(gdf: gpd.GeoDataFrame, protocol: str) -> gpd.GeoDataFrame:
     """
     Cleans column names for any GLOBE protocol by removing the protocol prefix and 
@@ -128,14 +160,13 @@ def globe_data(protocol: str, start_date: str, end_date: str,
     url = f"{base_url}?{'&'.join(params)}"
     
     # Fetch data into a GeoDataFrame
-    try:
-        gdf = gpd.read_file(url)
-    except Exception as e:
-        raise RuntimeError(f"Failed to fetch or parse data from GLOBE API: {e}")
-        
-    if gdf.empty:
+    features = _fetch_globe_features(url)
+
+    if not features:
         print("Warning: The API returned an empty dataset for the given parameters.")
-        return gdf
+        return gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+
+    gdf = gpd.GeoDataFrame.from_features(features, crs="EPSG:4326")
 
     # Column cleanup
     gdf = _clean_column_names(gdf, protocol)
