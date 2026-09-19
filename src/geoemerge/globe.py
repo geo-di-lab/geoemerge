@@ -3,15 +3,17 @@ import pandas as pd
 import numpy as np
 from typing import Any
 import requests
+from io import BytesIO
 from pathlib import Path
 
+# Copies of the GLOBE datasets that are used when the API is unreachable
+_FALLBACK_BASE_URL = (
+    "https://github.com/geo-di-lab/geoemerge/raw/refs/heads/main/data/"
+)
+
 _FALLBACK_DATASETS = {
-    "mosquito_habitat_mapper":
-        "https://github.com/geo-di-lab/emerge-lessons/raw/refs/heads/main/"
-        "docs/data/globe_mosquito.zip",
-    "land_covers":
-        "https://github.com/geo-di-lab/emerge-lessons/raw/refs/heads/main/"
-        "docs/data/globe_land_cover.zip",
+    "mosquito_habitat_mapper": _FALLBACK_BASE_URL + "mosquito_habitat_mapper.parquet",
+    "land_covers": _FALLBACK_BASE_URL + "land_covers.parquet",
 }
 
 def _clean_column_names(gdf: gpd.GeoDataFrame, protocol: str) -> gpd.GeoDataFrame:
@@ -172,15 +174,15 @@ def _load_fallback_dataset(protocol: str, start_date: str, end_date: str,
                            country_code: str = None) -> gpd.GeoDataFrame:
     """
     Loads the cached copy of a protocol and filters it to the requested dates.
-
-    The cached files already carry renamed columns; the cleanups are applied again
-    so that the result matches what the API path returns.
     """
     source = _FALLBACK_DATASETS[protocol]
     print(f"Falling back to the cached '{protocol}' dataset:\n  {source}")
 
-    gdf = gpd.read_file(source)
-    gdf = clean_globe_data(gdf, protocol)
+    # Download the cached dataset into memory
+    response = requests.get(source, timeout=300)
+    response.raise_for_status()
+
+    gdf = gpd.read_parquet(BytesIO(response.content))
 
     # Filter to the requested range, ending at midnight after the last day
     start = pd.to_datetime(start_date)
